@@ -27,8 +27,12 @@ struct ContentView: View {
                     }
                 }
                 .onDelete(perform: store.remove)
+                .onMove(perform: store.move)
             }
             .navigationTitle("メモ")
+            .toolbar {
+                EditButton()
+            }
         }
     }
 }
