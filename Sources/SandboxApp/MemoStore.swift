@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 struct Memo: Codable, Identifiable, Equatable {
     var id = UUID()
@@ -28,6 +29,11 @@ final class MemoStore {
 
     func remove(at offsets: IndexSet) {
         memos.remove(atOffsets: offsets)
+        save()
+    }
+
+    func move(fromOffsets source: IndexSet, toOffset destination: Int) {
+        memos.move(fromOffsets: source, toOffset: destination)
         save()
     }
 
