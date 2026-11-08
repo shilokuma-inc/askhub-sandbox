@@ -5,6 +5,12 @@ struct ContentView: View {
     @Bindable var store: MemoStore
     @State private var draft = ""
     @State private var draftColor: MemoColor?
+    /// 絞り込みの選択。保存しないので、開くたびに「すべて」から始まる
+    @State private var filter: MemoFilter = .all
+
+    private var filteredMemos: [Memo] {
+        filter.apply(to: store.memos)
+    }
 
     var body: some View {
         NavigationStack {
@@ -33,7 +39,10 @@ struct ContentView: View {
                     }
                     .pickerStyle(.menu)
                 }
-                ForEach(store.memos) { memo in
+                Section {
+                    filterBar
+                }
+                ForEach(filteredMemos) { memo in
                     HStack {
                         if let color = memo.color {
                             Circle()
@@ -52,13 +61,64 @@ struct ContentView: View {
                         colorMenu(for: memo)
                     }
                 }
-                .onDelete(perform: store.remove)
-                .onMove(perform: store.move)
+                .onDelete { offsets in
+                    let shown = filteredMemos
+                    store.remove(ids: offsets.map { shown[$0].id })
+                }
+                // 絞り込み中は並びの位置が全体とずれるので、並べ替えは「すべて」のときだけにする
+                .onMove(perform: filter == .all ? store.move : nil)
             }
             .navigationTitle("メモ")
             .toolbar {
                 EditButton()
             }
+        }
+    }
+
+    /// 一覧の上に並べる絞り込みの丸。選んでいる丸には外側に枠を付ける
+    private var filterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(MemoFilter.allCases, id: \.self) { item in
+                    Button {
+                        filter = item
+                    } label: {
+                        filterCircle(for: item)
+                            .padding(3)
+                            .overlay {
+                                if filter == item {
+                                    Circle().stroke(Color.primary, lineWidth: 2)
+                                }
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(item.name)
+                    .accessibilityAddTraits(filter == item ? .isSelected : [])
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func filterCircle(for item: MemoFilter) -> some View {
+        switch item {
+        case .all:
+            Circle()
+                .fill(Color.secondary.opacity(0.2))
+                .frame(width: 28, height: 28)
+                .overlay {
+                    Text("全")
+                        .font(.caption)
+                }
+        case .noColor:
+            Circle()
+                .strokeBorder(Color.secondary, style: StrokeStyle(lineWidth: 1.5, dash: [3]))
+                .frame(width: 28, height: 28)
+        case .color(let color):
+            Circle()
+                .fill(color.swatch)
+                .frame(width: 28, height: 28)
         }
     }
 
