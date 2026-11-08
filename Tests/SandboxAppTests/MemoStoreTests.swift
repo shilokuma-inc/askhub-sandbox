@@ -110,4 +110,9 @@ struct MemoStoreTests {
     @Test func colorsAreFive() {
         #expect(MemoColor.allCases == [.red, .blue, .green, .yellow, .purple])
     }
+
+    @Test func colorNamesAreJapanese() {
+        #expect(MemoColor.allCases.map(\.name) == ["赤", "青", "緑", "黄", "紫"])
+        #expect(MemoColor.noneName == "色なし")
+    }
 }
