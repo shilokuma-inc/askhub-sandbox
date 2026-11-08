@@ -63,4 +63,51 @@ struct MemoStoreTests {
         store.add("new")
         #expect(store.memos.map(\.text) == ["new", "c", "a", "b"])
     }
+
+    @Test func addsMemoWithColor() {
+        let store = MemoStore(defaults: defaults())
+        store.add("色なし")
+        store.add("赤", color: .red)
+        #expect(store.memos.map(\.color) == [.red, nil])
+    }
+
+    @Test func changesAndClearsColorAfterReopening() {
+        let defaults = defaults()
+        let store = MemoStore(defaults: defaults)
+        store.add("b")
+        store.add("a", color: .blue)
+        let a = store.memos[0].id
+        let b = store.memos[1].id
+        store.setColor(.purple, for: b)
+        store.setColor(nil, for: a)
+        #expect(store.memos.map(\.color) == [nil, .purple])
+        #expect(MemoStore(defaults: defaults).memos.map(\.color) == [nil, .purple])
+    }
+
+    @Test func loadsOldMemosWithoutColor() throws {
+        let defaults = defaults()
+        let json = """
+        [{"id":"\(UUID().uuidString)","text":"古い","createdAt":0}]
+        """
+        defaults.set(Data(json.utf8), forKey: "memos")
+        let store = MemoStore(defaults: defaults)
+        #expect(store.memos.map(\.text) == ["古い"])
+        #expect(store.memos.map(\.color) == [nil])
+    }
+
+    @Test func removesMemosByID() {
+        let defaults = defaults()
+        let store = MemoStore(defaults: defaults)
+        store.add("c", color: .red)
+        store.add("b")
+        store.add("a", color: .red)
+        let filtered = store.memos.filter { $0.color == .red }
+        store.remove(ids: [filtered[1].id])
+        #expect(store.memos.map(\.text) == ["a", "b"])
+        #expect(MemoStore(defaults: defaults).memos.map(\.text) == ["a", "b"])
+    }
+
+    @Test func colorsAreFive() {
+        #expect(MemoColor.allCases == [.red, .blue, .green, .yellow, .purple])
+    }
 }
