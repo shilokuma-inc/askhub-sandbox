@@ -62,6 +62,31 @@ struct MemoSearchTests {
         #expect(search("存在しない").isEmpty)
     }
 
+    @Test func combinesWithColorFilter() {
+        let colored = [
+            Memo(text: "Swift 赤", color: .red),
+            Memo(text: "Swift 青", color: .blue),
+            Memo(text: "メモ 赤", color: .red),
+        ]
+        // 一覧と同じく、色で絞り込んでから検索する
+        let shown = MemoSearch.filter(MemoFilter.color(.red).apply(to: colored), query: "swift")
+        #expect(shown.map(\.text) == ["Swift 赤"])
+    }
+
+    @Test func removesShownMemoFromColorFilteredAndSearchedList() {
+        let defaults = defaults()
+        let store = MemoStore(defaults: defaults)
+        store.add("swift 青", color: .blue)
+        store.add("swift 赤 2", color: .red)
+        store.add("b", color: .red)
+        store.add("Swift 赤 1", color: .red)
+        // 赤で絞り込んで「swift」で検索した並び（Swift 赤 1, swift 赤 2）の 2 つめを消す
+        let shown = MemoSearch.filter(MemoFilter.color(.red).apply(to: store.memos), query: "swift")
+        store.remove(ids: IndexSet(integer: 1).map { shown[$0].id })
+        #expect(store.memos.map(\.text) == ["Swift 赤 1", "b", "swift 青"])
+        #expect(MemoStore(defaults: defaults).memos.map(\.text) == ["Swift 赤 1", "b", "swift 青"])
+    }
+
     @Test func removesShownMemoFromSearchedList() {
         let defaults = defaults()
         let store = MemoStore(defaults: defaults)
