@@ -7,40 +7,32 @@ struct ContentView: View {
     @State private var draftColor: MemoColor?
     /// 絞り込みの選択。保存しないので、開くたびに「すべて」から始まる
     @State private var filter: MemoFilter = .all
+    /// 検索語。保存しないので、開くたびに空から始まる
+    @State private var query = ""
+
+    /// 前後の空白を除いた検索語が空でない間は検索中とみなす
+    private var isSearching: Bool {
+        !MemoSearch.terms(in: query).isEmpty
+    }
 
     private var filteredMemos: [Memo] {
-        filter.apply(to: store.memos)
+        MemoSearch.filter(filter.apply(to: store.memos), query: query)
     }
 
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    HStack {
-                        TextField("メモを追加", text: $draft)
-                        Button("追加") {
-                            store.add(draft, color: draftColor)
-                            draft = ""
-                            draftColor = nil
-                        }
-                        .disabled(draft.isEmpty)
-                    }
-                    Picker("色", selection: $draftColor) {
-                        Text(MemoColor.noneName).tag(MemoColor?.none)
-                        ForEach(MemoColor.allCases, id: \.self) { color in
-                            Label {
-                                Text(color.name)
-                            } icon: {
-                                Image(systemName: "circle.fill")
-                                    .foregroundStyle(color.swatch)
-                            }
-                            .tag(Optional(color))
-                        }
-                    }
-                    .pickerStyle(.menu)
+                // 検索中は追加欄を隠す
+                if !isSearching {
+                    addSection
                 }
                 Section {
                     filterBar
+                }
+                if isSearching && filteredMemos.isEmpty {
+                    // 一覧の行として出し、上の絞り込みの丸は押せるままにする
+                    ContentUnavailableView.search(text: query)
+                        .listRowBackground(Color.clear)
                 }
                 ForEach(filteredMemos) { memo in
                     HStack {
@@ -62,16 +54,46 @@ struct ContentView: View {
                     }
                 }
                 .onDelete { offsets in
+                    // 受け取る位置は絞り込んだ一覧の位置なので、id に変えて消す
                     let shown = filteredMemos
                     store.remove(ids: offsets.map { shown[$0].id })
                 }
-                // 絞り込み中は並びの位置が全体とずれるので、並べ替えは「すべて」のときだけにする
-                .onMove(perform: filter == .all ? store.move : nil)
+                // 絞り込み中は並びの位置が全体とずれるので、並べ替えは「すべて」で検索していないときだけにする
+                .onMove(perform: filter == .all && !isSearching ? store.move : nil)
             }
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "メモを検索")
             .navigationTitle("メモ")
             .toolbar {
                 EditButton()
             }
+        }
+    }
+
+    /// メモの追加欄
+    private var addSection: some View {
+        Section {
+            HStack {
+                TextField("メモを追加", text: $draft)
+                Button("追加") {
+                    store.add(draft, color: draftColor)
+                    draft = ""
+                    draftColor = nil
+                }
+                .disabled(draft.isEmpty)
+            }
+            Picker("色", selection: $draftColor) {
+                Text(MemoColor.noneName).tag(MemoColor?.none)
+                ForEach(MemoColor.allCases, id: \.self) { color in
+                    Label {
+                        Text(color.name)
+                    } icon: {
+                        Image(systemName: "circle.fill")
+                            .foregroundStyle(color.swatch)
+                    }
+                    .tag(Optional(color))
+                }
+            }
+            .pickerStyle(.menu)
         }
     }
 
