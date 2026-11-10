@@ -62,7 +62,7 @@ struct ContentView: View {
                 .onMove(perform: filter == .all && !isSearching ? store.move : nil)
             }
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "メモを検索")
-            .navigationTitle("メモ")
+            .navigationTitle("メモ一覧")
             .toolbar {
                 EditButton()
             }
