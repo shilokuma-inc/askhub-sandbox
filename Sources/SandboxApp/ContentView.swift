@@ -29,11 +29,9 @@ struct ContentView: View {
                 Section {
                     filterBar
                 }
-                if isSearching && filteredMemos.isEmpty {
-                    // 一覧の行として出し、上の絞り込みの丸は押せるままにする
-                    ContentUnavailableView.search(text: query)
-                        .listRowBackground(Color.clear)
-                }
+                // 一覧の行として出し、上の絞り込みの丸は押せるままにする
+                emptyStateRow
+                    .listRowBackground(Color.clear)
                 ForEach(filteredMemos) { memo in
                     HStack {
                         if let color = memo.color {
@@ -94,6 +92,25 @@ struct ContentView: View {
                 }
             }
             .pickerStyle(.menu)
+        }
+    }
+
+    /// 出すメモが 0 件のときの案内。出すメモがあるときは何も出さない
+    @ViewBuilder
+    private var emptyStateRow: some View {
+        switch MemoEmptyState.make(memos: store.memos, filter: filter, query: query) {
+        case .none:
+            EmptyView()
+        case .noMemos:
+            ContentUnavailableView(
+                "まだメモがありません",
+                systemImage: "note.text",
+                description: Text("上の欄から追加できます")
+            )
+        case .noMemosInFilter:
+            ContentUnavailableView("この色のメモはありません", systemImage: "circle.dashed")
+        case .noSearchResults:
+            ContentUnavailableView.search(text: query)
         }
     }
 
