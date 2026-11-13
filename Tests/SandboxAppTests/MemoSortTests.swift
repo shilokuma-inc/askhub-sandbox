@@ -55,6 +55,42 @@ struct MemoSortTests {
         #expect(memos == original)
     }
 
+    @Test func allowsMoveOnlyWhenManualAllAndNotSearching() {
+        #expect(MemoSort.manual.allowsMove(filter: .all, isSearching: false))
+        #expect(!MemoSort.manual.allowsMove(filter: .all, isSearching: true))
+        #expect(!MemoSort.manual.allowsMove(filter: .noColor, isSearching: false))
+        #expect(!MemoSort.manual.allowsMove(filter: .color(.red), isSearching: false))
+        #expect(!MemoSort.newestFirst.allowsMove(filter: .all, isSearching: false))
+        #expect(!MemoSort.oldestFirst.allowsMove(filter: .all, isSearching: false))
+    }
+
+    @Test func sortsFilteredAndSearchedMemos() {
+        let memos = [
+            Memo(text: "買い物 b", createdAt: Date(timeIntervalSince1970: 200), color: .red),
+            Memo(text: "買い物 c", createdAt: Date(timeIntervalSince1970: 300), color: .blue),
+            Memo(text: "買い物 a", createdAt: Date(timeIntervalSince1970: 100), color: .red),
+            Memo(text: "宿題 d", createdAt: Date(timeIntervalSince1970: 400), color: .red),
+        ]
+        let shown = MemoSearch.filter(MemoFilter.color(.red).apply(to: memos), query: "買い物")
+        #expect(MemoSort.newestFirst.apply(to: shown).map(\.text) == ["買い物 b", "買い物 a"])
+        #expect(MemoSort.oldestFirst.apply(to: shown).map(\.text) == ["買い物 a", "買い物 b"])
+    }
+
+    @Test func removesRightMemoFromSortedListWithoutChangingStoredOrder() {
+        let store = MemoStore(defaults: defaults())
+        store.add("a")
+        store.add("b")
+        store.add("c")
+        let stored = store.memos
+        let shown = MemoSort.oldestFirst.apply(to: stored)
+        #expect(store.memos == stored)
+        // 表示の先頭（一番古いもの）を消す
+        let target = shown[0]
+        store.remove(ids: [target.id])
+        #expect(!store.memos.contains { $0.id == target.id })
+        #expect(store.memos == stored.filter { $0.id != target.id })
+    }
+
     @Test func defaultsToManualWhenNothingSaved() {
         #expect(MemoSort(storedIn: defaults()) == .manual)
     }

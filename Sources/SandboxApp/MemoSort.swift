@@ -36,6 +36,11 @@ enum MemoSort: String, CaseIterable, Identifiable {
         }
     }
 
+    /// ドラッグで並べ替えてよいか。表示の位置が保存順と同じになる、手動で「すべて」で検索していないときだけ
+    func allowsMove(filter: MemoFilter, isSearching: Bool) -> Bool {
+        self == .manual && filter == .all && !isSearching
+    }
+
     /// 保存された並べ替えを読み込む。保存が無いときや読めない値のときは manual
     init(storedIn defaults: UserDefaults) {
         self = defaults.string(forKey: Self.storageKey).flatMap(Self.init(rawValue:)) ?? .manual
