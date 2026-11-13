@@ -4,12 +4,7 @@ name: build
 # AskHub のワーカーは、子 PR と最終 PR でこのジョブ（チェック名 build）を待つ
 on:
   pull_request:
-    # ドキュメントだけの変更では Build を実行しない（試しのために足した絞り）
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
   push:
-    paths-ignore: ['**/*.md']
     branches: [develop, main]
 
 permissions:

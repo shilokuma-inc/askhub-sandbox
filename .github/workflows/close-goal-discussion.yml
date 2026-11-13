@@ -1,9 +1,0 @@
-name: Close goal discussion
-# 今の仕組み（ralph-kit）のワークフロー（試しのために足したもの。AskHub の準備で外れるか確かめる）
-on:
-  pull_request:
-    types: [closed]
-    branches: [never-matches-askhub-try]
-jobs:
-  close:
-    uses: shilokuma-inc/ralph-kit/.github/workflows/close-goal.yml@main
