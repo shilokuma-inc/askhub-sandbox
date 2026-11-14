@@ -54,6 +54,11 @@ struct MemoPinGroupsTests {
         #expect(!MemoPinGroups(memos: [], sort: .manual).showsHeaders)
     }
 
+    @Test func pinActionNameIsTheOppositeOfCurrentState() {
+        #expect(Memo(text: "a").pinActionName == "ピン留め")
+        #expect(Memo(text: "a", isPinned: true).pinActionName == "ピン留めを外す")
+    }
+
     @Test func groupsFilteredAndSearchedMemos() {
         let memos = [
             Memo(text: "買い物 b", createdAt: Date(timeIntervalSince1970: 200), color: .red, isPinned: true),
