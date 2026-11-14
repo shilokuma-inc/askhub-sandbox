@@ -95,6 +95,90 @@ struct MemoStoreTests {
         #expect(store.memos.map(\.color) == [nil])
     }
 
+    @Test func loadsOldMemosWithoutPinned() throws {
+        let defaults = defaults()
+        let json = """
+        [{"id":"\(UUID().uuidString)","text":"古い","createdAt":0,"color":"red"}]
+        """
+        defaults.set(Data(json.utf8), forKey: "memos")
+        let store = MemoStore(defaults: defaults)
+        #expect(store.memos.map(\.text) == ["古い"])
+        #expect(store.memos.map(\.color) == [.red])
+        #expect(store.memos.map(\.isPinned) == [false])
+    }
+
+    @Test func newMemoIsNotPinned() {
+        let store = MemoStore(defaults: defaults())
+        store.add("a")
+        #expect(store.memos.map(\.isPinned) == [false])
+    }
+
+    @Test func pinsAndUnpinsAfterReopening() {
+        let defaults = defaults()
+        let store = MemoStore(defaults: defaults)
+        store.add("c")
+        store.add("b")
+        store.add("a")
+        let a = store.memos[0].id
+        let c = store.memos[2].id
+        store.setPinned(true, for: a)
+        store.setPinned(true, for: c)
+        #expect(store.memos.map(\.isPinned) == [true, false, true])
+        #expect(MemoStore(defaults: defaults).memos.map(\.isPinned) == [true, false, true])
+        store.setPinned(false, for: a)
+        #expect(store.memos.map(\.isPinned) == [false, false, true])
+        let reopened = MemoStore(defaults: defaults)
+        #expect(reopened.memos.map(\.isPinned) == [false, false, true])
+        #expect(reopened.memos.map(\.text) == ["a", "b", "c"])
+    }
+
+    /// 保存順が p1, o1, p2, o2, p3 になるストアを作る（p はピン留め、o はその他）
+    private func mixedStore(_ defaults: UserDefaults) -> MemoStore {
+        let store = MemoStore(defaults: defaults)
+        for text in ["p3", "o2", "p2", "o1", "p1"] {
+            store.add(text)
+        }
+        for memo in store.memos where memo.text.hasPrefix("p") {
+            store.setPinned(true, for: memo.id)
+        }
+        return store
+    }
+
+    @Test func movesOnlyInsidePinnedGroup() {
+        let store = mixedStore(defaults())
+        // ピン留めのまとまり p1, p2, p3 の先頭を末尾へ
+        store.move(fromOffsets: IndexSet(integer: 0), toOffset: 3, pinned: true)
+        #expect(store.memos.map(\.text) == ["p2", "o1", "p3", "o2", "p1"])
+        store.move(fromOffsets: IndexSet(integer: 2), toOffset: 0, pinned: true)
+        #expect(store.memos.map(\.text) == ["p1", "o1", "p2", "o2", "p3"])
+    }
+
+    @Test func movesOnlyInsideOtherGroup() {
+        let store = mixedStore(defaults())
+        // その他のまとまり o1, o2 を入れ替える
+        store.move(fromOffsets: IndexSet(integer: 1), toOffset: 0, pinned: false)
+        #expect(store.memos.map(\.text) == ["p1", "o2", "p2", "o1", "p3"])
+    }
+
+    @Test func keepsGroupMoveAfterReopening() {
+        let defaults = defaults()
+        let store = mixedStore(defaults)
+        store.move(fromOffsets: IndexSet([0, 1]), toOffset: 3, pinned: true)
+        #expect(store.memos.map(\.text) == ["p3", "o1", "p1", "o2", "p2"])
+        let reopened = MemoStore(defaults: defaults)
+        #expect(reopened.memos.map(\.text) == ["p3", "o1", "p1", "o2", "p2"])
+        #expect(reopened.memos.map(\.isPinned) == [true, false, true, false, true])
+    }
+
+    @Test func groupMoveMatchesShownGroups() {
+        let store = mixedStore(defaults())
+        let before = MemoPinGroups(memos: store.memos, sort: .manual)
+        store.move(fromOffsets: IndexSet(integer: 0), toOffset: 2, pinned: false)
+        let after = MemoPinGroups(memos: store.memos, sort: .manual)
+        #expect(after.pinned == before.pinned)
+        #expect(after.others.map(\.text) == ["o2", "o1"])
+    }
+
     @Test func removesMemosByID() {
         let defaults = defaults()
         let store = MemoStore(defaults: defaults)
