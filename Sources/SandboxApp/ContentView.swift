@@ -17,9 +17,9 @@ struct ContentView: View {
         !MemoSearch.terms(in: query).isEmpty
     }
 
-    /// 絞り込み・検索をしたあとに並べ替えた、表示する一覧
-    private var shownMemos: [Memo] {
-        sort.apply(to: MemoSearch.filter(filter.apply(to: store.memos), query: query))
+    /// 絞り込み・検索をしたあとに、ピン留めとその他に分けて並べ替えた、表示する一覧
+    private var shownGroups: MemoPinGroups {
+        MemoPinGroups(memos: MemoSearch.filter(filter.apply(to: store.memos), query: query), sort: sort)
     }
 
     var body: some View {
@@ -35,33 +35,20 @@ struct ContentView: View {
                 // 一覧の行として出し、上の絞り込みの丸は押せるままにする
                 emptyStateRow
                     .listRowBackground(Color.clear)
-                ForEach(shownMemos) { memo in
-                    HStack {
-                        if let color = memo.color {
-                            Circle()
-                                .fill(color.swatch)
-                                .frame(width: 12, height: 12)
-                                .accessibilityLabel(color.name)
-                        }
-                        VStack(alignment: .leading) {
-                            Text(memo.text)
-                            Text(memo.createdAt, style: .date)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                let groups = shownGroups
+                if groups.showsHeaders {
+                    Section("ピン留め") {
+                        memoRows(groups.pinned, pinned: true)
+                    }
+                    if !groups.others.isEmpty {
+                        Section("その他") {
+                            memoRows(groups.others, pinned: false)
                         }
                     }
-                    .contextMenu {
-                        colorMenu(for: memo)
-                    }
+                } else {
+                    // ピン留めが 0 件のときは見出しを出さず、今までどおりの一覧にする
+                    memoRows(groups.others, pinned: false)
                 }
-                .onDelete { offsets in
-                    // 受け取る位置は絞り込み・並べ替えをした一覧の位置なので、id に変えて消す
-                    let shown = shownMemos
-                    store.remove(ids: offsets.map { shown[$0].id })
-                }
-                // 絞り込み・検索・新しい順・古い順のときは表示の位置が保存順とずれるので、
-                // ドラッグでの並べ替えは手動で「すべて」で検索していないときだけにする
-                .onMove(perform: sort.allowsMove(filter: filter, isSearching: isSearching) ? store.move : nil)
             }
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "メモを検索")
             .navigationTitle("メモ一覧")
@@ -183,6 +170,63 @@ struct ContentView: View {
         }
     }
 
+    /// 1 つのまとまりのメモの行。消す・動かすはこのまとまりの中の位置で受け取る
+    private func memoRows(_ memos: [Memo], pinned: Bool) -> some View {
+        // 絞り込み・検索・新しい順・古い順のときは表示の位置が保存順とずれるので、
+        // ドラッグでの並べ替えは手動で「すべて」で検索していないときだけにする。
+        // 動かせるのはまとまりの中だけで、もう一方のまとまりのメモの位置は変えない
+        let move: ((IndexSet, Int) -> Void)? = sort.allowsMove(filter: filter, isSearching: isSearching)
+            ? { source, destination in
+                store.move(fromOffsets: source, toOffset: destination, pinned: pinned)
+            }
+            : nil
+        return ForEach(memos) { memo in
+            HStack {
+                if let color = memo.color {
+                    Circle()
+                        .fill(color.swatch)
+                        .frame(width: 12, height: 12)
+                        .accessibilityLabel(color.name)
+                }
+                VStack(alignment: .leading) {
+                    Text(memo.text)
+                    Text(memo.createdAt, style: .date)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if memo.isPinned {
+                    Spacer()
+                    Image(systemName: "pin.fill")
+                        .foregroundStyle(.orange)
+                        .accessibilityLabel("ピン留め")
+                }
+            }
+            .contextMenu {
+                pinButton(for: memo)
+                Divider()
+                colorMenu(for: memo)
+            }
+            .swipeActions(edge: .leading) {
+                pinButton(for: memo)
+                    .tint(.orange)
+            }
+        }
+        .onDelete { offsets in
+            // 受け取る位置は絞り込み・並べ替えをしたまとまりの中の位置なので、id に変えて消す
+            store.remove(ids: offsets.map { memos[$0].id })
+        }
+        .onMove(perform: move)
+    }
+
+    /// ピン留めを付け外しするボタン
+    private func pinButton(for memo: Memo) -> some View {
+        Button {
+            store.setPinned(!memo.isPinned, for: memo.id)
+        } label: {
+            Label(memo.pinActionName, systemImage: memo.isPinned ? "pin.slash" : "pin")
+        }
+    }
+
     /// メモの色を変える・外すボタン。いま付いている色にはチェックを付ける
     @ViewBuilder
     private func colorMenu(for memo: Memo) -> some View {
@@ -206,6 +250,13 @@ struct ContentView: View {
                 }
             }
         }
+    }
+}
+
+extension Memo {
+    /// ピン留めを付け外しするボタンの名前。いまの状態の逆にする操作の名前を出す
+    var pinActionName: String {
+        isPinned ? "ピン留めを外す" : "ピン留め"
     }
 }
 
