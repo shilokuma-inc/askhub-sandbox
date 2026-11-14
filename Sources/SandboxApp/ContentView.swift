@@ -9,14 +9,17 @@ struct ContentView: View {
     @State private var filter: MemoFilter = .all
     /// 検索語。保存しないので、開くたびに空から始まる
     @State private var query = ""
+    /// 並べ替えの選択。UserDefaults に保存し、次に開いたときも同じ並べ替えで出す
+    @AppStorage(MemoSort.storageKey) private var sort: MemoSort = .manual
 
     /// 前後の空白を除いた検索語が空でない間は検索中とみなす
     private var isSearching: Bool {
         !MemoSearch.terms(in: query).isEmpty
     }
 
-    private var filteredMemos: [Memo] {
-        MemoSearch.filter(filter.apply(to: store.memos), query: query)
+    /// 絞り込み・検索をしたあとに並べ替えた、表示する一覧
+    private var shownMemos: [Memo] {
+        sort.apply(to: MemoSearch.filter(filter.apply(to: store.memos), query: query))
     }
 
     var body: some View {
@@ -32,7 +35,7 @@ struct ContentView: View {
                 // 一覧の行として出し、上の絞り込みの丸は押せるままにする
                 emptyStateRow
                     .listRowBackground(Color.clear)
-                ForEach(filteredMemos) { memo in
+                ForEach(shownMemos) { memo in
                     HStack {
                         if let color = memo.color {
                             Circle()
@@ -52,17 +55,23 @@ struct ContentView: View {
                     }
                 }
                 .onDelete { offsets in
-                    // 受け取る位置は絞り込んだ一覧の位置なので、id に変えて消す
-                    let shown = filteredMemos
+                    // 受け取る位置は絞り込み・並べ替えをした一覧の位置なので、id に変えて消す
+                    let shown = shownMemos
                     store.remove(ids: offsets.map { shown[$0].id })
                 }
-                // 絞り込み中は並びの位置が全体とずれるので、並べ替えは「すべて」で検索していないときだけにする
-                .onMove(perform: filter == .all && !isSearching ? store.move : nil)
+                // 絞り込み・検索・新しい順・古い順のときは表示の位置が保存順とずれるので、
+                // ドラッグでの並べ替えは手動で「すべて」で検索していないときだけにする
+                .onMove(perform: sort.allowsMove(filter: filter, isSearching: isSearching) ? store.move : nil)
             }
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "メモを検索")
             .navigationTitle("メモ一覧")
             .toolbar {
-                EditButton()
+                ToolbarItem(placement: .topBarLeading) {
+                    sortMenu
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    EditButton()
+                }
             }
         }
     }
@@ -92,6 +101,19 @@ struct ContentView: View {
                 }
             }
             .pickerStyle(.menu)
+        }
+    }
+
+    /// 並べ替えを選ぶメニュー。いま選んでいるものにはチェックが付く
+    private var sortMenu: some View {
+        Menu {
+            Picker("並べ替え", selection: $sort) {
+                ForEach(MemoSort.allCases) { item in
+                    Text(item.name).tag(item)
+                }
+            }
+        } label: {
+            Label("並べ替え: \(sort.name)", systemImage: "arrow.up.arrow.down")
         }
     }
 
