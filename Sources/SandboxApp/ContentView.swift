@@ -32,6 +32,9 @@ struct ContentView: View {
                 Section {
                     filterBar
                 }
+                // 検索中で追加欄を隠しているときも件数は出す
+                countRow
+                    .listRowBackground(Color.clear)
                 // 一覧の行として出し、上の絞り込みの丸は押せるままにする
                 emptyStateRow
                     .listRowBackground(Color.clear)
@@ -101,6 +104,17 @@ struct ContentView: View {
             }
         } label: {
             Label("並べ替え: \(sort.name)", systemImage: "arrow.up.arrow.down")
+        }
+    }
+
+    /// メモの件数とピン留めの件数の行。メモが 1 件も無いときは何も出さない
+    @ViewBuilder
+    private var countRow: some View {
+        let count = MemoCount.make(memos: store.memos, filter: filter, query: query)
+        if !count.isHidden {
+            Text(verbatim: count.text)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 
